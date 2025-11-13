@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/arwoosa/vulpes/log"
+	"github.com/94peter/vulpes/log"
 	"github.com/gin-contrib/sessions"
 	"github.com/line/line-bot-sdk-go/v7/linebot"
 

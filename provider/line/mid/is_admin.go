@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/arwoosa/vulpes/log"
+	"github.com/94peter/vulpes/log"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 

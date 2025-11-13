@@ -2,10 +2,8 @@ module github.com/94peter/botreplyer
 
 go 1.24.6
 
-replace github.com/arwoosa/vulpes => /Users/peter/Codes/oosa/vulpes
-
 require (
-	github.com/arwoosa/vulpes v0.2.6-dev
+	github.com/94peter/vulpes v0.0.1
 	github.com/gin-contrib/sessions v1.0.4
 	github.com/gin-gonic/gin v1.11.0
 	github.com/goccy/go-yaml v1.18.0

@@ -7,7 +7,7 @@ package mongo
 // 	"time"
 
 // 	"github.com/94peter/botreplyer/session"
-// 	"github.com/arwoosa/vulpes/db/mgo"
+// 	"github.com/94peter/vulpes/db/mgo"
 // 	"go.mongodb.org/mongo-driver/v2/bson"
 // 	"go.mongodb.org/mongo-driver/v2/mongo"
 // )

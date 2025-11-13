@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/94peter/botreplyer/follow"
-	"github.com/arwoosa/vulpes/db/mgo"
+	"github.com/94peter/vulpes/db/mgo"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
