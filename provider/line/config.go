@@ -3,6 +3,7 @@ package line
 import (
 	"github.com/94peter/botreplyer/follow"
 	"github.com/94peter/botreplyer/group"
+	"github.com/94peter/botreplyer/provider/line/reply"
 	"github.com/94peter/botreplyer/provider/line/reply/textreply"
 )
 
@@ -15,6 +16,8 @@ type Config struct {
 
 	FollowStore follow.Store
 	GroupStore  group.Store
+
+	JoinGroupReplyFunc reply.JoinGroupReplyFunc
 }
 
 var DefaultConfig = &Config{}
@@ -42,5 +45,11 @@ func WithReplies(replies ...textreply.LineKeywordReply) Option {
 func WithAdminUserId(userId string) Option {
 	return func(c *Config) {
 		c.AdminUserId = userId
+	}
+}
+
+func WithJoinGroupReplyFunc(f reply.JoinGroupReplyFunc) Option {
+	return func(c *Config) {
+		c.JoinGroupReplyFunc = f
 	}
 }

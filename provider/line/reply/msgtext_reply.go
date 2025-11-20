@@ -19,6 +19,12 @@ func WithTextReply(replies ...textreply.LineKeywordReply) ReplyOption {
 	}
 }
 
+func WithJoinGroupReply(f JoinGroupReplyFunc) ReplyOption {
+	return func(r *replyImpl) {
+		r.joinGroupReplyFunc = f
+	}
+}
+
 func NewReply(
 	replyOptions ...ReplyOption,
 ) Reply {
@@ -30,7 +36,8 @@ func NewReply(
 }
 
 type replyImpl struct {
-	keywordReplySlice []textreply.LineKeywordReply
+	keywordReplySlice  []textreply.LineKeywordReply
+	joinGroupReplyFunc JoinGroupReplyFunc
 }
 
 func (svc *replyImpl) MessageTextReply(ctx context.Context, typ linebot.EventSourceType, groupID, userID, msg string, session sessions.Session) ([]linebot.SendingMessage, textreply.DelayedMessage, error) {

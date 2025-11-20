@@ -68,6 +68,7 @@ func initLineBot(cfg *line.Config) error {
 			reply.NewReply(
 				reply.WithTextReply(cfg.Replies...),
 				// reply.WithStore(cfg.SessionStore),
+				reply.WithJoinGroupReply(cfg.JoinGroupReplyFunc),
 			),
 		),
 		handler.WithFollowStore(cfg.FollowStore),
