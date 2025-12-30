@@ -10,6 +10,8 @@ import (
 	"github.com/94peter/vulpes/log"
 	"github.com/gin-gonic/gin"
 	"github.com/line/line-bot-sdk-go/v7/linebot"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/94peter/botreplyer/follow"
 	"github.com/94peter/botreplyer/group"
@@ -54,7 +56,8 @@ var initLinebotWebhookOnce sync.Once
 
 func InitLinebotWebhook(opts ...linebotWebhookAPIOption) {
 	initLinebotWebhookOnce.Do(func() {
-		api := &linebotWebhookAPI{}
+		replyTracer := otel.Tracer("botReply_handler")
+		api := &linebotWebhookAPI{tracer: replyTracer}
 		for _, opt := range opts {
 			opt(api)
 		}
@@ -92,6 +95,7 @@ type linebotWebhookAPI struct {
 	followStore  follow.Store
 	groupStore   group.Store
 	adminUserId  string
+	tracer       trace.Tracer
 }
 
 func (d *linebotWebhookAPI) InjectSessionStore(store store.Store, cookieName string) {
@@ -132,7 +136,7 @@ func (d *linebotWebhookAPI) webhook(c *gin.Context) {
 		switch event.Type {
 		case linebot.EventTypeLeave:
 			// 離開群組的行為
-			ctx, cancel := context.WithTimeout(c, time.Second)
+			ctx, cancel := context.WithTimeout(c.Request.Context(), time.Second)
 			defer cancel()
 			err := d.groupStore.Delete(ctx, event.Source.GroupID)
 			if err != nil {
@@ -143,7 +147,7 @@ func (d *linebotWebhookAPI) webhook(c *gin.Context) {
 			// 加入群組的行為
 			// TODO: 加上判斷允許群組數量是否達到上限
 			active := true
-			ctx, cancel := context.WithTimeout(c, time.Second)
+			ctx, cancel := context.WithTimeout(c.Request.Context(), time.Second)
 			defer cancel()
 			err := d.groupStore.Add(ctx, event.Source.GroupID, active)
 			if err != nil {
@@ -162,7 +166,7 @@ func (d *linebotWebhookAPI) webhook(c *gin.Context) {
 			}
 		case linebot.EventTypeUnfollow:
 			// 取消追蹤的行為
-			ctx, cancel := context.WithTimeout(c, time.Second)
+			ctx, cancel := context.WithTimeout(c.Request.Context(), time.Second)
 			defer cancel()
 			err := d.followStore.Delete(ctx, event.Source.UserID)
 			if err != nil {
@@ -171,7 +175,7 @@ func (d *linebotWebhookAPI) webhook(c *gin.Context) {
 			}
 		case linebot.EventTypeFollow:
 			log.Infof("follow: %s", event.Source.UserID)
-			ctx, cancel := context.WithTimeout(c, time.Second)
+			ctx, cancel := context.WithTimeout(c.Request.Context(), time.Second)
 			defer cancel()
 			userInfo, err := d.bot.GetUserInfo(event.Source.UserID)
 			if err != nil {
@@ -183,7 +187,7 @@ func (d *linebotWebhookAPI) webhook(c *gin.Context) {
 				log.Warnf("Failed to add follow: %v", err)
 				continue
 			}
-			msgReplies, err := d.svc.WelcomeReply(c, event.Source.UserID)
+			msgReplies, err := d.svc.WelcomeReply(c.Request.Context(), event.Source.UserID)
 			if err != nil {
 				log.Warnf("Failed to get welcome reply: %v", err)
 			}
@@ -224,7 +228,7 @@ func (d *linebotWebhookAPI) webhook(c *gin.Context) {
 				}()
 
 				if !session.IsKeyExist(ginSession, session.KeyIsAdmin) {
-					follow, err := d.followStore.Get(c, userId)
+					follow, err := d.followStore.Get(c.Request.Context(), userId)
 					if err != nil {
 						ginSession.Set(session.KeyIsAdmin, false)
 					} else {
@@ -233,21 +237,26 @@ func (d *linebotWebhookAPI) webhook(c *gin.Context) {
 				}
 
 				// Echo the same message back to the user
-				msgReplies, delayedMsg, err := d.svc.MessageTextReply(c, typ, groupId, userId, message.Text, ginSession)
+				msgReplies, delayedMsg, err := d.svc.MessageTextReply(c.Request.Context(), typ, groupId, userId, message.Text, ginSession)
 				if err != nil {
 					log.Warnf("Failed to get reply: %v", err)
 				}
 				if len(msgReplies) == 0 {
 					continue
 				}
+				_, span := d.tracer.Start(c.Request.Context(), "bot_reply_message", trace.WithSpanKind(trace.SpanKindClient))
 				if _, err = d.bot.ReplyMessage(event.ReplyToken, msgReplies...); err != nil {
 					log.Warnf("Failed to reply: %v", err)
 				}
+				span.End()
+
 				if delayedMsg != nil {
 					msgs := <-delayedMsg
+					_, pushspan := d.tracer.Start(c.Request.Context(), "bot_push_message", trace.WithSpanKind(trace.SpanKindClient))
 					if _, err = d.bot.PushMessage(event.Source.UserID, msgs...); err != nil {
 						log.Warnf("Failed to push: %v", err)
 					}
+					pushspan.End()
 				}
 
 			}

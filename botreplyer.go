@@ -9,6 +9,7 @@ import (
 	"github.com/94peter/botreplyer/handler"
 	"github.com/94peter/botreplyer/provider/line"
 	"github.com/94peter/botreplyer/provider/line/reply"
+	"go.opentelemetry.io/otel"
 )
 
 type config struct {
@@ -62,6 +63,7 @@ func initLineBot(cfg *line.Config) error {
 	if err != nil {
 		return err
 	}
+	replyTracer := otel.Tracer("BotReplier")
 	handler.InitLinebotWebhook(
 		handler.WithLineSDK(sdk),
 		handler.WithLineMsgReplyService(
@@ -69,6 +71,7 @@ func initLineBot(cfg *line.Config) error {
 				reply.WithTextReply(cfg.Replies...),
 				// reply.WithStore(cfg.SessionStore),
 				reply.WithJoinGroupReply(cfg.JoinGroupReplyFunc),
+				reply.WithTracer(replyTracer),
 			),
 		),
 		handler.WithFollowStore(cfg.FollowStore),
