@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"net/http"
 	"sync"
 	"time"
 
@@ -11,11 +12,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/line/line-bot-sdk-go/v7/linebot"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/94peter/botreplyer/follow"
 	"github.com/94peter/botreplyer/group"
 	"github.com/94peter/botreplyer/provider/line"
+	"github.com/94peter/botreplyer/provider/line/notify"
 	"github.com/94peter/botreplyer/provider/line/reply"
 	"github.com/94peter/botreplyer/session"
 )
@@ -52,6 +55,12 @@ func WithGroupStore(store group.Store) linebotWebhookAPIOption {
 	}
 }
 
+func WithLineNotificationService(notifySvc notify.LineNotificationService) linebotWebhookAPIOption {
+	return func(api *linebotWebhookAPI) {
+		api.notifySvc = notifySvc
+	}
+}
+
 var initLinebotWebhookOnce sync.Once
 
 func InitLinebotWebhook(opts ...linebotWebhookAPIOption) {
@@ -77,12 +86,13 @@ func InitLinebotWebhook(opts ...linebotWebhookAPIOption) {
 			panic("group store is nil")
 		}
 		ezapi.RegisterSessionInjector(api)
-		ezapi.RegisterGinApi(func(r ezapi.Router) {
+		ezapi.RegisterGinApi(func(r ezapi.RouterGroup) {
 			// health check
 			r.GET("/linebot", api.getEndpoint)
 			// linebot webhook
 			r.POST("/line", api.webhook)
 			r.GET("/follow/is-admin", api.isAdmin)
+			r.POST("/line/notification/:type", api.notification)
 		})
 	})
 }
@@ -96,6 +106,7 @@ type linebotWebhookAPI struct {
 	groupStore   group.Store
 	adminUserId  string
 	tracer       trace.Tracer
+	notifySvc    notify.LineNotificationService
 }
 
 func (d *linebotWebhookAPI) InjectSessionStore(store store.Store, cookieName string) {
@@ -116,6 +127,35 @@ func (d *linebotWebhookAPI) isAdmin(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"isAdmin": follow.IsAdmin()})
+}
+
+func (d *linebotWebhookAPI) notification(c *gin.Context) {
+	if d.notifySvc == nil {
+		c.Writer.WriteHeader(500)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "notify service not set"})
+		return
+	}
+	typ := c.Param("type")
+	contents := d.notifySvc.GetNotification(c.Request.Context(), typ)
+	_, pushspan := d.tracer.Start(c.Request.Context(), "bot_push_message", trace.WithSpanKind(trace.SpanKindClient))
+	maxWorkers := 5 // 控制併發數量
+	sem := make(chan struct{}, maxWorkers)
+	wg := sync.WaitGroup{}
+	pushspan.SetAttributes(attribute.Int("message_number", len(contents)))
+	for _, content := range contents {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			if _, err := d.bot.PushMessage(content.UserIDs, content.Message...); err != nil {
+				log.Warnf("Failed to push: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+	pushspan.End()
+	c.Writer.WriteHeader(200)
 }
 
 func (d *linebotWebhookAPI) getEndpoint(c *gin.Context) {
