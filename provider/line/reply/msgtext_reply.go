@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/94peter/vulpes/log"
 	"github.com/gin-contrib/sessions"
 	"github.com/line/line-bot-sdk-go/v7/linebot"
 	"go.opentelemetry.io/otel/attribute"
@@ -56,14 +55,7 @@ type replyImpl struct {
 }
 
 func (svc *replyImpl) MessageTextReply(ctx context.Context, typ linebot.EventSourceType, groupID, userID, msg string, session sessions.Session) ([]linebot.SendingMessage, textreply.DelayedMessage, error) {
-	defer func() {
-		err := session.Save()
-		if err != nil {
-			log.Errorf("upsert session error: %v", err)
-		}
-	}()
 	msg = strings.Trim(msg, " ")
-
 	ctx, span := svc.startTraceSpan(ctx, "message_reply")
 	defer span.End()
 	for _, reply := range svc.keywordReplySlice {
