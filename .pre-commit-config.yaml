@@ -1,0 +1,12 @@
+repos:
+-   repo: local
+    hooks:
+    -   id: dagger-ci
+        name: Dagger CI Checks
+        # 呼叫你在 dagger/main.go 定義的專案檢查函式
+        entry: dagger call run-all-checks --source=.
+        language: system
+        pass_filenames: false
+        always_run: false
+        files: \.go$          # 只有 Go 檔變動才跑
+        exclude: ^dagger/     # 排除 dagger 目錄自身的變動，避免無限迴圈
