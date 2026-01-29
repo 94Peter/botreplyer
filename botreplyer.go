@@ -77,6 +77,7 @@ func initLineBot(cfg *line.Config) error {
 		handler.WithFollowStore(cfg.FollowStore),
 		handler.WithGroupStore(cfg.GroupStore),
 		handler.WithAdminUserId(cfg.AdminUserId),
+		handler.WithLineNotificationService(cfg.NotificationService),
 	)
 	return nil
 }

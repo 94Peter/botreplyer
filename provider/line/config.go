@@ -3,6 +3,7 @@ package line
 import (
 	"github.com/94peter/botreplyer/follow"
 	"github.com/94peter/botreplyer/group"
+	"github.com/94peter/botreplyer/provider/line/notify"
 	"github.com/94peter/botreplyer/provider/line/reply"
 	"github.com/94peter/botreplyer/provider/line/reply/textreply"
 )
@@ -17,7 +18,8 @@ type Config struct {
 	FollowStore follow.Store
 	GroupStore  group.Store
 
-	JoinGroupReplyFunc reply.JoinGroupReplyFunc
+	JoinGroupReplyFunc  reply.JoinGroupReplyFunc
+	NotificationService notify.LineNotificationService
 }
 
 var DefaultConfig = &Config{}
@@ -51,5 +53,11 @@ func WithAdminUserId(userId string) Option {
 func WithJoinGroupReplyFunc(f reply.JoinGroupReplyFunc) Option {
 	return func(c *Config) {
 		c.JoinGroupReplyFunc = f
+	}
+}
+
+func WithNotificationService(s notify.LineNotificationService) Option {
+	return func(c *Config) {
+		c.NotificationService = s
 	}
 }
