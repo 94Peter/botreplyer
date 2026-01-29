@@ -9,17 +9,14 @@ import (
 )
 
 type Config struct {
-	ChannelSecret string
-	ChannelToken  string
-	AdminUserId   string
-
-	Replies []textreply.LineKeywordReply
-
-	FollowStore follow.Store
-	GroupStore  group.Store
-
-	JoinGroupReplyFunc  reply.JoinGroupReplyFunc
+	FollowStore         follow.Store
+	GroupStore          group.Store
 	NotificationService notify.LineNotificationService
+	JoinGroupReplyFunc  reply.JoinGroupReplyFunc
+	ChannelSecret       string
+	ChannelToken        string
+	AdminUserId         string
+	Replies             []textreply.LineKeywordReply
 }
 
 var DefaultConfig = &Config{}

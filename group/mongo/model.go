@@ -33,12 +33,12 @@ func NewGroup() *Group {
 }
 
 type Group struct {
+	CreatedAt time.Time `bson:"created_at"`
 	mgo.Index `bson:"-"`
-	ID        bson.ObjectID `bson:"_id"`
 	GroupID   string        `bson:"group_id"`
 	Name      string        `bson:"name"`
+	ID        bson.ObjectID `bson:"_id"`
 	Disable   bool          `bson:"disable"`
-	CreatedAt time.Time     `bson:"created_at"`
 }
 
 func (s *Group) GetId() any {
@@ -53,7 +53,7 @@ func (s *Group) SetId(id any) {
 	s.ID = oid
 }
 
-func (p *Group) Validate() error {
+func (*Group) Validate() error {
 	return nil
 }
 

@@ -49,12 +49,17 @@ func NewReply(
 }
 
 type replyImpl struct {
-	keywordReplySlice  []textreply.LineKeywordReply
-	joinGroupReplyFunc JoinGroupReplyFunc
 	tracer             trace.Tracer
+	joinGroupReplyFunc JoinGroupReplyFunc
+	keywordReplySlice  []textreply.LineKeywordReply
 }
 
-func (svc *replyImpl) MessageTextReply(ctx context.Context, typ linebot.EventSourceType, groupID, userID, msg string, session sessions.Session) ([]linebot.SendingMessage, textreply.DelayedMessage, error) {
+func (svc *replyImpl) MessageTextReply(
+	ctx context.Context,
+	typ linebot.EventSourceType,
+	groupID, userID, msg string,
+	session sessions.Session,
+) ([]linebot.SendingMessage, textreply.DelayedMessage, error) {
 	msg = strings.Trim(msg, " ")
 	ctx, span := svc.startTraceSpan(ctx, "message_reply")
 	defer span.End()
@@ -74,7 +79,10 @@ func (svc *replyImpl) MessageTextReply(ctx context.Context, typ linebot.EventSou
 	return nil, nil, nil
 }
 
-func (m *replyImpl) startTraceSpan(ctx context.Context, name string, attributes ...attribute.KeyValue) (context.Context, trace.Span) {
+func (m *replyImpl) startTraceSpan(
+	ctx context.Context, name string,
+	attributes ...attribute.KeyValue,
+) (context.Context, trace.Span) {
 	ctx, span := m.tracer.Start(ctx, name, trace.WithSpanKind(trace.SpanKindInternal))
 	span.SetAttributes(
 		append([]attribute.KeyValue{

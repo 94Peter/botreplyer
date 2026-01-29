@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/94peter/botreplyer/follow"
+
 	"github.com/94peter/vulpes/db/mgo"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -30,13 +31,13 @@ func NewStore(ctx context.Context) (MongoFollow, error) {
 	return &mongoStore{}, nil
 }
 
-func (store *mongoStore) Delete(ctx context.Context, userID string) error {
+func (*mongoStore) Delete(ctx context.Context, userID string) error {
 	_, err := mgo.DeleteOne(ctx, NewFollow(), bson.D{{Key: "user_id", Value: userID}})
 	return err
 }
 
 // 新增
-func (store *mongoStore) Add(ctx context.Context, userID string, userName string, isAdmin bool) error {
+func (*mongoStore) Add(ctx context.Context, userID string, userName string, isAdmin bool) error {
 	follow := NewFollow()
 	follow.UserID = userID
 	follow.IsSetAdmin = isAdmin
@@ -46,14 +47,14 @@ func (store *mongoStore) Add(ctx context.Context, userID string, userName string
 }
 
 // 取得
-func (store *mongoStore) Get(ctx context.Context, userID string) (follow.Follow, error) {
+func (*mongoStore) Get(ctx context.Context, userID string) (follow.Follow, error) {
 	follow := NewFollow()
 	err := mgo.FindOne(ctx, follow, bson.D{{Key: "user_id", Value: userID}})
 	return follow, err
 }
 
 // 設定為管理員
-func (store *mongoStore) Admin(ctx context.Context, userID string) error {
+func (*mongoStore) Admin(ctx context.Context, userID string) error {
 	_, err := mgo.UpdateOne(
 		ctx, NewFollow(),
 		bson.D{{Key: "user_id", Value: userID}},
@@ -62,7 +63,7 @@ func (store *mongoStore) Admin(ctx context.Context, userID string) error {
 }
 
 // 取消管理員
-func (store *mongoStore) UnAdmin(ctx context.Context, userID string) error {
+func (*mongoStore) UnAdmin(ctx context.Context, userID string) error {
 	_, err := mgo.UpdateOne(
 		ctx, NewFollow(),
 		bson.D{{Key: "user_id", Value: userID}},

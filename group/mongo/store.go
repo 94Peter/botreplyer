@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/94peter/botreplyer/group"
+
 	"github.com/94peter/vulpes/db/mgo"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -25,13 +26,13 @@ func NewStore(ctx context.Context) (group.Store, error) {
 	return &mongoStore{}, nil
 }
 
-func (store *mongoStore) Delete(ctx context.Context, groupID string) error {
+func (*mongoStore) Delete(ctx context.Context, groupID string) error {
 	_, err := mgo.DeleteOne(ctx, NewGroup(), bson.D{{Key: "group_id", Value: groupID}})
 	return err
 }
 
 // 新增
-func (store *mongoStore) Add(ctx context.Context, groupID string, active bool) error {
+func (*mongoStore) Add(ctx context.Context, groupID string, active bool) error {
 	obj := NewGroup()
 	obj.GroupID = groupID
 	obj.Disable = !active
@@ -40,14 +41,14 @@ func (store *mongoStore) Add(ctx context.Context, groupID string, active bool) e
 }
 
 // 取得
-func (store *mongoStore) Get(ctx context.Context, userID string) (group.Group, error) {
+func (*mongoStore) Get(ctx context.Context, userID string) (group.Group, error) {
 	obj := NewGroup()
 	err := mgo.FindOne(ctx, obj, bson.D{{Key: "group_id", Value: userID}})
 	return obj, err
 }
 
 // 設定為管理員
-func (store *mongoStore) Active(ctx context.Context, userID string) error {
+func (*mongoStore) Active(ctx context.Context, userID string) error {
 	_, err := mgo.UpdateOne(
 		ctx, NewGroup(),
 		bson.D{{Key: "group_id", Value: userID}},
@@ -56,7 +57,7 @@ func (store *mongoStore) Active(ctx context.Context, userID string) error {
 }
 
 // 取消管理員
-func (store *mongoStore) Inactive(ctx context.Context, userID string) error {
+func (*mongoStore) Inactive(ctx context.Context, userID string) error {
 	_, err := mgo.UpdateOne(
 		ctx, NewGroup(),
 		bson.D{{Key: "group_id", Value: userID}},

@@ -12,6 +12,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type ctxLineLiffKey string
+
+const (
+	CtxLineLiffUserId   ctxLineLiffKey = "line.liff.userid"
+	CtxLineLiffLocale   ctxLineLiffKey = "line.liff.locale"
+	CtxLineLiffUserName ctxLineLiffKey = "line.liff.username"
+)
+
 // LineLiff is a middleware that extracts locale and userid from the request
 // and saves them into the session.
 // The locale is extracted from the URL path (e.g., /en/some/path -> "en").
@@ -21,7 +29,7 @@ func LineLiff() gin.HandlerFunc {
 		sess := sessions.Default(c)
 
 		// Extract locale from path, e.g., /en/training -> en
-		var changed bool = false
+		var changed bool
 		if lang := c.Param("lang"); lang != "" {
 			sess.Set("locale", lang)
 			changed = true
@@ -29,11 +37,10 @@ func LineLiff() gin.HandlerFunc {
 
 		// Extract userid from query string, e.g., ?userid=1234
 		if token := c.Query("user_token"); token != "" {
-			profile, err := getLineUserProfile(token)
+			profile, err := getLineUserProfile(c.Request.Context(), token)
 			if err != nil {
 				log.Err(err)
-				c.Writer.WriteHeader(http.StatusUnauthorized)
-				c.Writer.Write([]byte("Failed to get line user profile: " + err.Error()))
+				c.String(http.StatusUnauthorized, "Failed to get line user profile: %v", err)
 				c.Abort()
 				return
 			}
@@ -54,15 +61,13 @@ func LineLiff() gin.HandlerFunc {
 		locale := sess.Get("locale")
 		userName := sess.Get("userName")
 
-		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), "line.liff.userid", userID))
-		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), "line.liff.locale", userID))
-		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), "line.liff.username", userID))
+		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), CtxLineLiffUserId, userID))
+		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), CtxLineLiffLocale, userID))
+		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), CtxLineLiffUserName, userID))
 
-		// c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), "line.liff.locale", locale))
-		// c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), "line.liff.username", userName))
-		c.Set("line.liff.userid", userID)
-		c.Set("line.liff.locale", locale)
-		c.Set("line.liff.username", userName)
+		c.Set(CtxLineLiffUserId, userID)
+		c.Set(CtxLineLiffLocale, locale)
+		c.Set(CtxLineLiffUserName, userName)
 		c.Next()
 	}
 }
@@ -74,8 +79,8 @@ type lineProfile struct {
 	StatusMessage string `json:"statusMessage"`
 }
 
-func getLineUserProfile(accessToken string) (*lineProfile, error) {
-	req, err := http.NewRequest("GET", "https://api.line.me/v2/profile", nil)
+func getLineUserProfile(ctx context.Context, accessToken string) (*lineProfile, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.line.me/v2/profile", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -85,9 +90,13 @@ func getLineUserProfile(accessToken string) (*lineProfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Err(err)
+		}
+	}()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("line API error: %s", string(body))
 	}

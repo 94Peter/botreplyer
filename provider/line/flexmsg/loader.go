@@ -3,6 +3,7 @@ package flexmsg
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"text/template"
 
 	"gopkg.in/yaml.v3"
@@ -10,8 +11,8 @@ import (
 
 // FlexTemplate holds the alt text and the template body for a flex message.
 type FlexTemplate struct {
-	AltText  string
 	Template *template.Template
+	AltText  string
 }
 
 type messageYAML struct {
@@ -25,7 +26,7 @@ var (
 
 // Load reads the YAML file from the given path and loads the templates into memory.
 func Load(path string) error {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return fmt.Errorf("failed to read template file: %w", err)
 	}

@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/goccy/go-yaml"
@@ -44,9 +45,12 @@ type conversationMgr struct {
 	mu               sync.RWMutex
 }
 
-func NewConversationMgr(llmmodel llms.Model, configFile string, mcpBaseUrls []string, opts ...ConversationMgrOption) (ConversationMgr, error) {
+func NewConversationMgr(
+	llmmodel llms.Model, configFile string, mcpBaseUrls []string,
+	opts ...ConversationMgrOption,
+) (ConversationMgr, error) {
 	var cfx ConversationPromptConfig
-	bytes, err := os.ReadFile(configFile)
+	bytes, err := os.ReadFile(filepath.Clean(configFile))
 	if err != nil {
 		return nil, err
 	}

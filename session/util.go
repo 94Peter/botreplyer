@@ -7,15 +7,16 @@ import (
 const KeyIsAdmin = "linebot-is-admin"
 
 func IsKeyExist(session ginSessions.Session, key string) bool {
-	if session.Get(key) == nil {
-		return false
-	}
-	return true
+	return session.Get(key) != nil
 }
 
 func IsAdmin(session ginSessions.Session) bool {
 	if session.Get(KeyIsAdmin) == nil {
 		return false
 	}
-	return session.Get(KeyIsAdmin).(bool)
+	val, ok := session.Get(KeyIsAdmin).(bool)
+	if !ok {
+		return false
+	}
+	return val
 }

@@ -33,12 +33,12 @@ func NewFollow() *Follow {
 }
 
 type Follow struct {
+	CreatedAt  time.Time `bson:"created_at"`
 	mgo.Index  `bson:"-"`
-	ID         bson.ObjectID `bson:"_id"`
 	UserID     string        `bson:"user_id"`
 	UserName   string        `bson:"user_name"`
+	ID         bson.ObjectID `bson:"_id"`
 	IsSetAdmin bool          `bson:"is_admin"`
-	CreatedAt  time.Time     `bson:"created_at"`
 }
 
 func (s *Follow) GetId() any {
@@ -53,7 +53,7 @@ func (s *Follow) SetId(id any) {
 	s.ID = oid
 }
 
-func (p *Follow) Validate() error {
+func (*Follow) Validate() error {
 	return nil
 }
 

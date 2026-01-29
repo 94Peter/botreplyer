@@ -11,19 +11,24 @@ import (
 	"github.com/94peter/botreplyer/follow"
 )
 
-const keyIsAdmin = "isAdmin"
+type ctxIsAdminKey string
+
+const keyIsAdmin ctxIsAdminKey = "is_admin"
 
 func CheckAdmin(store follow.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sess := sessions.Default(c)
 
 		if val := sess.Get(keyIsAdmin); val != nil {
-			isAdmin := val.(bool)
+			isAdmin, ok := val.(bool)
+			if !ok {
+				isAdmin = false
+			}
 			setIsAdmin(c, isAdmin)
 			c.Next()
 			return
 		}
-		userId := c.GetString("line.liff.userid")
+		userId := c.GetString(CtxLineLiffUserId)
 		if userId == "" {
 			c.Set(keyIsAdmin, false)
 			c.Next()

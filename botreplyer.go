@@ -9,6 +9,7 @@ import (
 	"github.com/94peter/botreplyer/handler"
 	"github.com/94peter/botreplyer/provider/line"
 	"github.com/94peter/botreplyer/provider/line/reply"
+
 	"go.opentelemetry.io/otel"
 )
 
@@ -20,7 +21,10 @@ func InitBotReplyer(ctx context.Context, options ...Option) error {
 	// init bot replyer
 	c := &config{}
 	for _, option := range options {
-		option(c)
+		err := option(c)
+		if err != nil {
+			return err
+		}
 	}
 	var err error
 	// sessionStore, err := sessionMongo.NewSessionStore(ctx)

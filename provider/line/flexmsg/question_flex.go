@@ -10,8 +10,8 @@ import (
 
 type question struct {
 	Question string
-	Index    int
 	Options  []*QuestOption
+	Index    int
 }
 
 type QuestOption struct {

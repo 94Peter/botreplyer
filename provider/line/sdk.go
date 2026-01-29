@@ -1,6 +1,7 @@
 package line
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -22,13 +23,18 @@ type UserInfo struct {
 	Language   string `json:"language"`
 }
 
+const (
+	defaultCacheExpiration      = 5 * time.Minute
+	defaultCacheCleanupInterval = 10 * time.Minute
+)
+
 func NewSDK(channelSecret, accessToken string) (SDK, error) {
 	bot, err := linebot.New(channelSecret, accessToken)
 	if err != nil {
 		return nil, err
 	}
 	return &sdkImpl{
-		cache: gocache.New(5*time.Minute, 10*time.Minute),
+		cache: gocache.New(defaultCacheExpiration, defaultCacheCleanupInterval),
 		bot:   bot,
 	}, nil
 }
@@ -55,7 +61,13 @@ const userInfoCacheKeyPrefix = "user:"
 func (s *sdkImpl) GetUserInfo(userId string) (*UserInfo, error) {
 	key := userInfoCacheKeyPrefix + userId
 	if userInfo, found := s.cache.Get(key); found {
-		return userInfo.(*UserInfo), nil
+		if userInfo == nil {
+			return nil, errors.New("user info not found")
+		}
+		if userInfo, ok := userInfo.(*UserInfo); ok {
+			return userInfo, nil
+		}
+		return nil, errors.New("invalid user info cache")
 	}
 	userInfo, err := s.getUserInfoFromSdk(userId)
 	if err != nil {

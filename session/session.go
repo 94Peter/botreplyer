@@ -1,7 +1,7 @@
 package session
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"log/slog"
 	"net/http"
@@ -18,7 +18,7 @@ const (
 )
 
 func UserIdToObjectID(userId string) string {
-	sum := md5.Sum([]byte(userId))
+	sum := sha256.Sum256([]byte(userId))
 	// 取前 12 bytes（24 hex 字元）
 	hexStr := hex.EncodeToString(sum[:12])
 	oid, _ := bson.ObjectIDFromHex(hexStr)
@@ -37,28 +37,28 @@ func NewSessionFromSession(c *gin.Context, name string, s *sessions.Session, sto
 }
 
 type session struct {
-	name    string
-	request *http.Request
 	store   sessions.Store
-	session *sessions.Session
-	written bool
 	writer  http.ResponseWriter
+	request *http.Request
+	session *sessions.Session
+	name    string
+	written bool
 }
 
 func (s *session) ID() string {
 	return s.Session().ID
 }
 
-func (s *session) Get(key interface{}) interface{} {
+func (s *session) Get(key any) any {
 	return s.Session().Values[key]
 }
 
-func (s *session) Set(key interface{}, val interface{}) {
+func (s *session) Set(key any, val any) {
 	s.Session().Values[key] = val
 	s.written = true
 }
 
-func (s *session) Delete(key interface{}) {
+func (s *session) Delete(key any) {
 	delete(s.Session().Values, key)
 	s.written = true
 }
@@ -69,12 +69,12 @@ func (s *session) Clear() {
 	}
 }
 
-func (s *session) AddFlash(value interface{}, vars ...string) {
+func (s *session) AddFlash(value any, vars ...string) {
 	s.Session().AddFlash(value, vars...)
 	s.written = true
 }
 
-func (s *session) Flashes(vars ...string) []interface{} {
+func (s *session) Flashes(vars ...string) []any {
 	s.written = true
 	return s.Session().Flashes(vars...)
 }

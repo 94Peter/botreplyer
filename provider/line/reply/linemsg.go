@@ -11,6 +11,9 @@ import (
 
 type Reply interface {
 	WelcomeReply(ctx context.Context, userID string) ([]linebot.SendingMessage, error)
-	MessageTextReply(ctx context.Context, typ linebot.EventSourceType, groupId, userID, msg string, session sessions.Session) ([]linebot.SendingMessage, textreply.DelayedMessage, error)
+	MessageTextReply(
+		ctx context.Context, typ linebot.EventSourceType,
+		groupId, userID, msg string, session sessions.Session,
+	) ([]linebot.SendingMessage, textreply.DelayedMessage, error)
 	JoinGroupReply(ctx context.Context) ([]linebot.SendingMessage, error)
 }

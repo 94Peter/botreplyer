@@ -8,7 +8,7 @@ import (
 	"github.com/94peter/botreplyer/provider/line/flexmsg"
 )
 
-func (svc *replyImpl) WelcomeReply(ctx context.Context, userID string) ([]linebot.SendingMessage, error) {
+func (*replyImpl) WelcomeReply(_ context.Context, _ string) ([]linebot.SendingMessage, error) {
 	flex := flexmsg.WelcomeFlex{}
 	msg, err := flex.Build()
 	if err != nil {

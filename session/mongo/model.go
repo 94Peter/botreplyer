@@ -31,13 +31,13 @@ func NewSession() *Session {
 }
 
 type Session struct {
+	UpdatedAt time.Time `bson:"updated_at"`
 	mgo.Index `bson:"-"`
-	ID        bson.ObjectID `bson:"_id"`
 	UserID    string        `bson:"user_id"`
 	Topic     string        `bson:"topic"`
 	State     string        `bson:"state"`
 	Context   bson.Raw      `bson:"context,omitempty"`
-	UpdatedAt time.Time     `bson:"updated_at"`
+	ID        bson.ObjectID `bson:"_id"`
 }
 
 func (s *Session) GetTopic() string {
@@ -67,6 +67,6 @@ func (s *Session) SetId(id any) {
 	s.ID = oid
 }
 
-func (p *Session) Validate() error {
+func (*Session) Validate() error {
 	return nil
 }
