@@ -65,10 +65,12 @@ func WithLineNotificationService(notifySvc notify.LineNotificationService) lineb
 
 var initLinebotWebhookOnce sync.Once
 
+const defaultWorkerPoolSize = 50
+
 func InitLinebotWebhook(opts ...linebotWebhookAPIOption) {
 	initLinebotWebhookOnce.Do(func() {
 		replyTracer := otel.Tracer("botReply_handler")
-		api := &linebotWebhookAPI{tracer: replyTracer}
+		api := &linebotWebhookAPI{tracer: replyTracer, workerPool: NewWorkerPool(defaultWorkerPoolSize)}
 		for _, opt := range opts {
 			opt(api)
 		}
@@ -105,6 +107,7 @@ type linebotWebhookAPI struct {
 	groupStore   group.Store
 	tracer       trace.Tracer
 	notifySvc    notify.LineNotificationService
+	workerPool   *workerPool
 	cookieName   string
 	adminUserId  string
 }
@@ -271,8 +274,9 @@ func (d *linebotWebhookAPI) handleMessageEvent(c *gin.Context, event *linebot.Ev
 	}
 }
 
+const replyTimeout = 30 * time.Second
+
 func (d *linebotWebhookAPI) handleTextMsgEvent(c *gin.Context, event *linebot.Event, message *linebot.TextMessage) {
-	log.Debug("line msg: " + message.Text)
 	name := d.cookieName
 	userId := event.Source.UserID
 	typ := event.Source.Type
@@ -289,7 +293,6 @@ func (d *linebotWebhookAPI) handleTextMsgEvent(c *gin.Context, event *linebot.Ev
 		log.Warnf("Failed to get session: %v", err)
 		return
 	}
-	defer saveSession()
 
 	if !session.IsKeyExist(ginSession, session.KeyIsAdmin) {
 		follow, err := d.followStore.Get(c.Request.Context(), userId)
@@ -300,29 +303,35 @@ func (d *linebotWebhookAPI) handleTextMsgEvent(c *gin.Context, event *linebot.Ev
 		}
 	}
 
-	// Echo the same message back to the user
-	msgReplies, delayedMsg, err := d.svc.MessageTextReply(
-		c.Request.Context(), typ, groupId, userId, message.Text, ginSession)
+	err = d.workerPool.Run(c.Request.Context(), func() {
+		appCtx, cancel := context.WithTimeout(context.Background(), replyTimeout)
+		defer cancel()
+		msgReplies, delayedMsg, err := d.svc.MessageTextReply(
+			appCtx, typ, groupId, userId, message.Text, ginSession)
+		if err != nil {
+			log.Warnf("Failed to get reply: %v", err)
+			return
+		}
+		if len(msgReplies) == 0 {
+			saveSession()
+			return
+		}
+		saveSession()
+		if _, err = d.bot.ReplyMessage(event.ReplyToken, msgReplies...); err != nil {
+			log.Warnf("Failed to reply: %v", err)
+		}
+		if delayedMsg != nil {
+			msgs := <-delayedMsg
+			if _, err = d.bot.PushMessage(event.Source.UserID, msgs...); err != nil {
+				log.Warnf("Failed to push: %v", err)
+			}
+		}
+	})
 	if err != nil {
-		log.Warnf("Failed to get reply: %v", err)
-	}
-	if len(msgReplies) == 0 {
+		c.String(http.StatusInternalServerError, "Failed to run worker: %v", err)
 		return
 	}
-	_, span := d.tracer.Start(c.Request.Context(), "bot_reply_message", trace.WithSpanKind(trace.SpanKindClient))
-	if _, err = d.bot.ReplyMessage(event.ReplyToken, msgReplies...); err != nil {
-		log.Warnf("Failed to reply: %v", err)
-	}
-	span.End()
-
-	if delayedMsg != nil {
-		msgs := <-delayedMsg
-		_, pushspan := d.tracer.Start(c.Request.Context(), "bot_push_message", trace.WithSpanKind(trace.SpanKindClient))
-		if _, err = d.bot.PushMessage(event.Source.UserID, msgs...); err != nil {
-			log.Warnf("Failed to push: %v", err)
-		}
-		pushspan.End()
-	}
+	c.String(http.StatusOK, "OK")
 }
 
 func (d *linebotWebhookAPI) getSession(c *gin.Context, name, userId string) (sessions.Session, func(), error) {
@@ -341,4 +350,32 @@ func (d *linebotWebhookAPI) getSession(c *gin.Context, name, userId string) (ses
 			log.Warnf("Failed to save session: %v", err)
 		}
 	}, nil
+}
+
+type workerPool struct {
+	sem chan struct{}
+}
+
+func NewWorkerPool(maxWorkers int) *workerPool {
+	return &workerPool{
+		sem: make(chan struct{}, maxWorkers),
+	}
+}
+
+func (p *workerPool) Run(ctx context.Context, task func()) error {
+	select {
+	case p.sem <- struct{}{}:
+		go func() {
+			defer func() { <-p.sem }() // 執行完释放
+			defer func() {
+				if r := recover(); r != nil {
+					log.Warnf("Recovered from panic in worker: %v", r)
+				}
+			}()
+			task()
+		}()
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
