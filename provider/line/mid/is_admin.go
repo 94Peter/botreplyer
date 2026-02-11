@@ -28,7 +28,7 @@ func CheckAdmin(store follow.Store) gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		userId := c.GetString(CtxLineLiffUserId)
+		userId := c.GetString(ctxLineLiffUserId)
 		if userId == "" {
 			c.Set(keyIsAdmin, false)
 			c.Next()
@@ -54,4 +54,8 @@ func CheckAdmin(store follow.Store) gin.HandlerFunc {
 func setIsAdmin(c *gin.Context, isAdmin bool) {
 	c.Set(keyIsAdmin, isAdmin)
 	c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), keyIsAdmin, isAdmin))
+}
+
+func IsAdmin(c *gin.Context) bool {
+	return c.GetBool(keyIsAdmin)
 }

@@ -15,9 +15,9 @@ import (
 type ctxLineLiffKey string
 
 const (
-	CtxLineLiffUserId   ctxLineLiffKey = "line.liff.userid"
-	CtxLineLiffLocale   ctxLineLiffKey = "line.liff.locale"
-	CtxLineLiffUserName ctxLineLiffKey = "line.liff.username"
+	ctxLineLiffUserId   ctxLineLiffKey = "line.liff.userid"
+	ctxLineLiffLocale   ctxLineLiffKey = "line.liff.locale"
+	ctxLineLiffUserName ctxLineLiffKey = "line.liff.username"
 )
 
 // LineLiff is a middleware that extracts locale and userid from the request
@@ -61,13 +61,13 @@ func LineLiff() gin.HandlerFunc {
 		locale := sess.Get("locale")
 		userName := sess.Get("userName")
 
-		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), CtxLineLiffUserId, userID))
-		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), CtxLineLiffLocale, userID))
-		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), CtxLineLiffUserName, userID))
+		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), ctxLineLiffUserId, userID))
+		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), ctxLineLiffLocale, userID))
+		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), ctxLineLiffUserName, userID))
 
-		c.Set(CtxLineLiffUserId, userID)
-		c.Set(CtxLineLiffLocale, locale)
-		c.Set(CtxLineLiffUserName, userName)
+		c.Set(ctxLineLiffUserId, userID)
+		c.Set(ctxLineLiffLocale, locale)
+		c.Set(ctxLineLiffUserName, userName)
 		c.Next()
 	}
 }
@@ -107,4 +107,16 @@ func getLineUserProfile(ctx context.Context, accessToken string) (*lineProfile, 
 		return nil, err
 	}
 	return &profile, nil
+}
+
+func GetLineLiffUserId(c *gin.Context) string {
+	return c.GetString(ctxLineLiffUserId)
+}
+
+func GetLineLiffLocale(c *gin.Context) string {
+	return c.GetString(ctxLineLiffLocale)
+}
+
+func GetLineLiffUserName(c *gin.Context) string {
+	return c.GetString(ctxLineLiffUserName)
 }
