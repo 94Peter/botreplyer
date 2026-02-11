@@ -7,6 +7,7 @@ import (
 	followMongo "github.com/94peter/botreplyer/follow/mongo"
 	groupMongo "github.com/94peter/botreplyer/group/mongo"
 	"github.com/94peter/botreplyer/handler"
+	"github.com/94peter/botreplyer/llm"
 	"github.com/94peter/botreplyer/provider/line"
 	"github.com/94peter/botreplyer/provider/line/reply"
 
@@ -15,6 +16,7 @@ import (
 
 type config struct {
 	lineConfig *line.Config
+	llmReply   llm.LLMReply
 }
 
 func InitBotReplyer(ctx context.Context, options ...Option) error {
@@ -44,7 +46,7 @@ func InitBotReplyer(ctx context.Context, options ...Option) error {
 		// c.lineConfig.SessionStore = sessionStore
 		c.lineConfig.FollowStore = followStore
 		c.lineConfig.GroupStore = groupStore
-		err := initLineBot(c.lineConfig)
+		err := initLineBot(c.lineConfig, c.llmReply)
 		if err != nil {
 			return err
 		}
@@ -62,7 +64,7 @@ func GetFollowStore() follow.Store {
 	return _FollowStore
 }
 
-func initLineBot(cfg *line.Config) error {
+func initLineBot(cfg *line.Config, llmReply llm.LLMReply) error {
 	sdk, err := line.NewSDK(cfg.ChannelSecret, cfg.ChannelToken)
 	if err != nil {
 		return err
@@ -82,6 +84,7 @@ func initLineBot(cfg *line.Config) error {
 		handler.WithGroupStore(cfg.GroupStore),
 		handler.WithAdminUserId(cfg.AdminUserId),
 		handler.WithLineNotificationService(cfg.NotificationService),
+		handler.WithLLMReply(llmReply),
 	)
 	return nil
 }

@@ -19,6 +19,7 @@ import (
 
 	"github.com/94peter/botreplyer/follow"
 	"github.com/94peter/botreplyer/group"
+	"github.com/94peter/botreplyer/llm"
 	"github.com/94peter/botreplyer/provider/line"
 	"github.com/94peter/botreplyer/provider/line/notify"
 	"github.com/94peter/botreplyer/provider/line/reply"
@@ -60,6 +61,12 @@ func WithGroupStore(store group.Store) linebotWebhookAPIOption {
 func WithLineNotificationService(notifySvc notify.LineNotificationService) linebotWebhookAPIOption {
 	return func(api *linebotWebhookAPI) {
 		api.notifySvc = notifySvc
+	}
+}
+
+func WithLLMReply(llmReply llm.LLMReply) linebotWebhookAPIOption {
+	return func(api *linebotWebhookAPI) {
+		api.llmReply = llmReply
 	}
 }
 
@@ -108,6 +115,7 @@ type linebotWebhookAPI struct {
 	tracer       trace.Tracer
 	notifySvc    notify.LineNotificationService
 	workerPool   *workerPool
+	llmReply     llm.LLMReply
 	cookieName   string
 	adminUserId  string
 }
@@ -276,7 +284,9 @@ func (d *linebotWebhookAPI) handleMessageEvent(c *gin.Context, event *linebot.Ev
 
 const replyTimeout = 30 * time.Second
 
-func (d *linebotWebhookAPI) handleTextMsgEvent(c *gin.Context, event *linebot.Event, message *linebot.TextMessage) {
+func (d *linebotWebhookAPI) handleTextMsgEvent(
+	c *gin.Context, event *linebot.Event, message *linebot.TextMessage,
+) {
 	name := d.cookieName
 	userId := event.Source.UserID
 	typ := event.Source.Type
@@ -303,35 +313,65 @@ func (d *linebotWebhookAPI) handleTextMsgEvent(c *gin.Context, event *linebot.Ev
 		}
 	}
 
-	err = d.workerPool.Run(c.Request.Context(), func() {
+	appCtx, cancel := context.WithTimeout(c.Request.Context(), replyTimeout)
+	msgReplies, delayedMsg, err := d.svc.MessageTextReply(
+		appCtx, typ, groupId, userId, message.Text, ginSession)
+	if err != nil {
+		cancel()
+		saveSession()
+		log.Warnf("Failed to get reply: %v", err)
+		return
+	}
+	cancel()
+	saveSession()
+	if len(msgReplies) > 0 {
+		if _, err = d.bot.ReplyMessage(event.ReplyToken, msgReplies...); err != nil {
+			log.Warnf("Failed to reply: %v", err)
+		}
+	}
+	if delayedMsg != nil {
+		msgs := <-delayedMsg
+		if _, err = d.bot.PushMessage(event.Source.UserID, msgs...); err != nil {
+			log.Warnf("Failed to push: %v", err)
+		}
+	}
+	// 如果沒有回覆，則使用LLM回覆,使用workerPool執行，避免blocking
+	if len(msgReplies) == 0 && d.llmReply != nil && delayedMsg == nil {
+		d.llmReplyWorker(event, message, typ, groupId, userId, ginSession)
+	}
+
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to run worker: %v", err)
+		return
+	}
+	c.String(http.StatusOK, "OK")
+}
+
+func (d *linebotWebhookAPI) llmReplyWorker(
+	event *linebot.Event, message *linebot.TextMessage,
+	typ linebot.EventSourceType, groupId, userId string, ginSession sessions.Session,
+) {
+	ctx, cancel := context.WithTimeout(context.Background(), replyTimeout)
+	defer cancel()
+	err := d.workerPool.Run(ctx, func() {
 		appCtx, cancel := context.WithTimeout(context.Background(), replyTimeout)
 		defer cancel()
-		msgReplies, delayedMsg, err := d.svc.MessageTextReply(
+		msgReplies, err := d.llmReply.MessageTextReply(
 			appCtx, typ, groupId, userId, message.Text, ginSession)
 		if err != nil {
 			log.Warnf("Failed to get reply: %v", err)
 			return
 		}
 		if len(msgReplies) == 0 {
-			saveSession()
 			return
 		}
-		saveSession()
 		if _, err = d.bot.ReplyMessage(event.ReplyToken, msgReplies...); err != nil {
 			log.Warnf("Failed to reply: %v", err)
 		}
-		if delayedMsg != nil {
-			msgs := <-delayedMsg
-			if _, err = d.bot.PushMessage(event.Source.UserID, msgs...); err != nil {
-				log.Warnf("Failed to push: %v", err)
-			}
-		}
 	})
 	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to run worker: %v", err)
-		return
+		log.Warnf("Failed to run worker: %v", err)
 	}
-	c.String(http.StatusOK, "OK")
 }
 
 func (d *linebotWebhookAPI) getSession(c *gin.Context, name, userId string) (sessions.Session, func(), error) {
