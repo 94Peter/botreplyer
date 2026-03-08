@@ -46,7 +46,7 @@ func (m *Botreplyer) RunAllChecks(ctx context.Context, source *dagger.Directory)
 
 	// 1. 定義基礎環境 (鎖定 Go 1.24)
 	toolBase := dag.Container().
-		From("golang:1.24-bookworm").
+		From("golang:1.25-bookworm").
 		WithMountedCache("/go/pkg/mod", modCache).
 		WithMountedCache("/root/.cache/go-build", goCache).
 		WithExec([]string{"go", "install", "golang.org/x/vuln/cmd/govulncheck@latest"})

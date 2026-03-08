@@ -1,14 +1,15 @@
 module github.com/94peter/botreplyer
 
-go 1.24.6
+go 1.25.0
 
 require (
-	github.com/94peter/vulpes v0.2.0
+	github.com/94peter/vulpes v0.2.1
 	github.com/gin-contrib/sessions v1.0.4
 	github.com/gin-gonic/gin v1.11.0
 	github.com/goccy/go-yaml v1.19.0
 	github.com/gorilla/sessions v1.4.0
 	github.com/i2y/langchaingo-mcp-adapter v0.0.0-20250623114610-a01671e1c8df
+	github.com/invopop/ctxi18n v0.9.0
 	github.com/line/line-bot-sdk-go/v7 v7.21.0
 	github.com/mark3labs/mcp-go v0.42.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -59,6 +60,7 @@ require (
 	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.11 // indirect
+	github.com/gin-contrib/pprof v1.5.3 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -78,7 +80,6 @@ require (
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/imdario/mergo v0.3.13 // indirect
-	github.com/invopop/ctxi18n v0.9.0 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/invopop/yaml v0.2.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
