@@ -11,15 +11,13 @@ import (
 	"github.com/94peter/botreplyer/follow"
 )
 
-type ctxIsAdminKey string
-
-const keyIsAdmin ctxIsAdminKey = "is_admin"
+const keyIsAdmin ctxKey = "is_admin"
 
 func CheckAdmin(store follow.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sess := sessions.Default(c)
 
-		if val := sess.Get(keyIsAdmin); val != nil {
+		if val := sess.Get(string(keyIsAdmin)); val != nil {
 			isAdmin, ok := val.(bool)
 			if !ok {
 				isAdmin = false
@@ -28,34 +26,38 @@ func CheckAdmin(store follow.Store) gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		userId := c.GetString(ctxLineLiffUserId)
+
+		userId := c.GetString(string(keyUserId))
 		if userId == "" {
-			c.Set(keyIsAdmin, false)
+			setIsAdmin(c, false)
 			c.Next()
 			return
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), time.Second)
+		defer cancel()
 
 		f, err := store.Get(ctx, userId)
-		cancel()
 		if err != nil {
 			log.Err(err)
-			c.Set(keyIsAdmin, false)
+			setIsAdmin(c, false)
 			c.Next()
 			return
 		}
-		setIsAdmin(c, f.IsAdmin())
 
-		sess.Set(keyIsAdmin, f.IsAdmin())
+		isAdmin := f.IsAdmin()
+		setIsAdmin(c, isAdmin)
+
+		sess.Set(string(keyIsAdmin), isAdmin)
 		c.Next()
 	}
 }
 
 func setIsAdmin(c *gin.Context, isAdmin bool) {
-	c.Set(keyIsAdmin, isAdmin)
+	c.Set(string(keyIsAdmin), isAdmin)
 	c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), keyIsAdmin, isAdmin))
 }
 
 func IsAdmin(c *gin.Context) bool {
-	return c.GetBool(keyIsAdmin)
+	return c.GetBool(string(keyIsAdmin))
 }

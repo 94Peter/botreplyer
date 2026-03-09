@@ -12,30 +12,26 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type ctxLineLiffKey string
+type ctxKey string
 
 const (
-	ctxLineLiffUserId   ctxLineLiffKey = "line.liff.userid"
-	ctxLineLiffLocale   ctxLineLiffKey = "line.liff.locale"
-	ctxLineLiffUserName ctxLineLiffKey = "line.liff.username"
+	keyUserId   ctxKey = "line.liff.userid"
+	keyLocale   ctxKey = "line.liff.locale"
+	keyUserName ctxKey = "line.liff.username"
 )
 
 // LineLiff is a middleware that extracts locale and userid from the request
 // and saves them into the session.
-// The locale is extracted from the URL path (e.g., /en/some/path -> "en").
-// The userid is extracted from the "userid" query parameter.
 func LineLiff() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sess := sessions.Default(c)
 
-		// Extract locale from path, e.g., /en/training -> en
-		var changed bool
+		// Extract locale from path
 		if lang := c.Param("lang"); lang != "" {
 			sess.Set("locale", lang)
-			changed = true
 		}
 
-		// Extract userid from query string, e.g., ?userid=1234
+		// Extract user info from user_token
 		if token := c.Query("user_token"); token != "" {
 			profile, err := getLineUserProfile(c.Request.Context(), token)
 			if err != nil {
@@ -46,39 +42,24 @@ func LineLiff() gin.HandlerFunc {
 			}
 			sess.Set("userId", profile.UserID)
 			sess.Set("userName", profile.DisplayName)
-			changed = true
+			log.Infof("LineLiff: Logged in user %s (%s)", profile.DisplayName, profile.UserID)
 		}
 
-		if changed {
-			if err := sess.Save(); err != nil {
-				// Depending on the desired behavior, you might want to log this error
-				// or handle it more gracefully. For now, we'll let the request proceed.
-				log.Err(err)
-			}
-		}
+		userID, _ := sess.Get("userId").(string)
+		locale, _ := sess.Get("locale").(string)
+		userName, _ := sess.Get("userName").(string)
 
-		userID := sess.Get("userId")
-		locale := sess.Get("locale")
-		userName := sess.Get("userName")
+		// Set Gin Context Keys
+		c.Set(string(keyUserId), userID)
+		c.Set(string(keyLocale), locale)
+		c.Set(string(keyUserName), userName)
 
-		var userIDStr, localeStr, userNameStr string
-		if userID != nil {
-			userIDStr, _ = userID.(string)
-		}
-		if locale != nil {
-			localeStr, _ = locale.(string)
-		}
-		if userName != nil {
-			userNameStr, _ = userName.(string)
-		}
+		// Update Request Context for deep layers
+		ctx := context.WithValue(c.Request.Context(), keyUserId, userID)
+		ctx = context.WithValue(ctx, keyLocale, locale)
+		ctx = context.WithValue(ctx, keyUserName, userName)
+		c.Request = c.Request.WithContext(ctx)
 
-		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), ctxLineLiffUserId, userIDStr))
-		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), ctxLineLiffLocale, localeStr))
-		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), ctxLineLiffUserName, userNameStr))
-
-		c.Set(ctxLineLiffUserId, userIDStr)
-		c.Set(ctxLineLiffLocale, localeStr)
-		c.Set(ctxLineLiffUserName, userNameStr)
 		c.Next()
 	}
 }
@@ -102,9 +83,7 @@ func getLineUserProfile(ctx context.Context, accessToken string) (*lineProfile, 
 		return nil, err
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Err(err)
-		}
+		_ = resp.Body.Close()
 	}()
 
 	if resp.StatusCode != http.StatusOK {
@@ -113,21 +92,20 @@ func getLineUserProfile(ctx context.Context, accessToken string) (*lineProfile, 
 	}
 
 	var profile lineProfile
-	err = json.NewDecoder(resp.Body).Decode(&profile)
-	if err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
 		return nil, err
 	}
 	return &profile, nil
 }
 
 func GetLineLiffUserId(c *gin.Context) string {
-	return c.GetString(ctxLineLiffUserId)
+	return c.GetString(string(keyUserId))
 }
 
 func GetLineLiffLocale(c *gin.Context) string {
-	return c.GetString(ctxLineLiffLocale)
+	return c.GetString(string(keyLocale))
 }
 
 func GetLineLiffUserName(c *gin.Context) string {
-	return c.GetString(ctxLineLiffUserName)
+	return c.GetString(string(keyUserName))
 }

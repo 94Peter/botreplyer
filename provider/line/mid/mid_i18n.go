@@ -12,8 +12,8 @@ func I18n(defaultLanguage string, isLocalExist func(lang string) bool) gin.Handl
 	return func(c *gin.Context) {
 		var lang string
 		switch {
-		case c.GetString(ctxLineLiffLocale) != "":
-			lang = c.GetString(ctxLineLiffLocale)
+		case c.GetString(keyLocale) != "":
+			lang = c.GetString(keyLocale)
 		case c.Param("lang") != "":
 			lang = c.Param("lang")
 		}
@@ -28,7 +28,7 @@ func I18n(defaultLanguage string, isLocalExist func(lang string) bool) gin.Handl
 				c.Abort()
 				return
 			}
-			c.Request = c.Request.Clone(ctx)
+			c.Request = c.Request.WithContext(ctx)
 		}
 
 		c.Next()
