@@ -28,7 +28,10 @@ func LineLiff() gin.HandlerFunc {
 
 		// Extract locale from path
 		if lang := c.Param("lang"); lang != "" {
-			sess.Set("locale", lang)
+			oldLocale, _ := sess.Get("locale").(string)
+			if oldLocale != lang {
+				sess.Set("locale", lang)
+			}
 		}
 
 		// Extract user info from user_token
@@ -42,7 +45,7 @@ func LineLiff() gin.HandlerFunc {
 			}
 			sess.Set("userId", profile.UserID)
 			sess.Set("userName", profile.DisplayName)
-			log.Infof("LineLiff: Logged in user %s (%s)", profile.DisplayName, profile.UserID)
+			log.Infof("LineLiff: Logged in user %s (%s) from token", profile.DisplayName, profile.UserID)
 		}
 
 		userID, _ := sess.Get("userId").(string)
@@ -61,6 +64,17 @@ func LineLiff() gin.HandlerFunc {
 		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()
+	}
+}
+
+// SessionSaver ensuring that the session is saved at the end of the request.
+func SessionSaver() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+		sess := sessions.Default(c)
+		if err := sess.Save(); err != nil {
+			log.Errorf("SessionSaver: Failed to save session: %v", err)
+		}
 	}
 }
 
