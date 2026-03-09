@@ -61,13 +61,24 @@ func LineLiff() gin.HandlerFunc {
 		locale := sess.Get("locale")
 		userName := sess.Get("userName")
 
-		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), ctxLineLiffUserId, userID))
-		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), ctxLineLiffLocale, userID))
-		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), ctxLineLiffUserName, userID))
+		var userIDStr, localeStr, userNameStr string
+		if userID != nil {
+			userIDStr, _ = userID.(string)
+		}
+		if locale != nil {
+			localeStr, _ = locale.(string)
+		}
+		if userName != nil {
+			userNameStr, _ = userName.(string)
+		}
 
-		c.Set(ctxLineLiffUserId, userID)
-		c.Set(ctxLineLiffLocale, locale)
-		c.Set(ctxLineLiffUserName, userName)
+		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), ctxLineLiffUserId, userIDStr))
+		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), ctxLineLiffLocale, localeStr))
+		c.Request = c.Request.Clone(context.WithValue(c.Request.Context(), ctxLineLiffUserName, userNameStr))
+
+		c.Set(ctxLineLiffUserId, userIDStr)
+		c.Set(ctxLineLiffLocale, localeStr)
+		c.Set(ctxLineLiffUserName, userNameStr)
 		c.Next()
 	}
 }
