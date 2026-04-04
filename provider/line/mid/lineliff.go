@@ -18,6 +18,15 @@ const (
 	keyUserId   ctxKey = "line.liff.userid"
 	keyLocale   ctxKey = "line.liff.locale"
 	keyUserName ctxKey = "line.liff.username"
+	keyIsAdmin  ctxKey = "line.liff.isadmin"
+	keyIsDemo   ctxKey = "is_demo"
+)
+
+const (
+	sessionUserId   = "userId"
+	sessionUserName = "userName"
+	sessionLocale   = "locale"
+	sessionIsAdmin  = "isAdmin"
 )
 
 // LineLiff is a middleware that extracts locale and userid from the request
@@ -28,9 +37,9 @@ func LineLiff() gin.HandlerFunc {
 
 		// Extract locale from path
 		if lang := c.Param("lang"); lang != "" {
-			oldLocale, _ := sess.Get("locale").(string)
+			oldLocale, _ := sess.Get(sessionLocale).(string)
 			if oldLocale != lang {
-				sess.Set("locale", lang)
+				sess.Set(sessionLocale, lang)
 			}
 		}
 
@@ -43,14 +52,15 @@ func LineLiff() gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-			sess.Set("userId", profile.UserID)
-			sess.Set("userName", profile.DisplayName)
+			sess.Set(sessionUserId, profile.UserID)
+			sess.Set(sessionUserName, profile.DisplayName)
+
 			log.Infof("LineLiff: Logged in user %s (%s) from token", profile.DisplayName, profile.UserID)
 		}
 
-		userID, _ := sess.Get("userId").(string)
-		locale, _ := sess.Get("locale").(string)
-		userName, _ := sess.Get("userName").(string)
+		userID, _ := sess.Get(sessionUserId).(string)
+		locale, _ := sess.Get(sessionLocale).(string)
+		userName, _ := sess.Get(sessionUserName).(string)
 
 		// Set Gin Context Keys
 		c.Set(string(keyUserId), userID)

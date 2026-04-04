@@ -9,16 +9,16 @@ import (
 )
 
 const (
-	mockTrue         = "true"
-	isDemoKey ctxKey = "is_demo"
+	mockTrue = "true"
 )
 
 // MockAuth is a middleware that allows bypassing LINE login in Demo/Dev mode.
 // It checks for identity overrides in Query, Cookie, or Header.
 func MockAuth(isDemo bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set(isDemoKey, isDemo)
-		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), isDemoKey, isDemo))
+		c.Set(string(keyIsDemo), isDemo)
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), keyIsDemo, isDemo))
+
 		// Only enable if isDemo is true
 		if !isDemo {
 			c.Next()
@@ -29,10 +29,10 @@ func MockAuth(isDemo bool) gin.HandlerFunc {
 
 		// 1. Force ensure locale exists to prevent layout.templ from jumping to liff-init.js
 		const defaultLocale = "zh-tw"
-		userLocale, _ := sess.Get("locale").(string)
+		userLocale, _ := sess.Get(sessionLocale).(string)
 		if userLocale == "" {
 			userLocale = defaultLocale
-			sess.Set("locale", userLocale)
+			sess.Set(sessionLocale, userLocale)
 			_ = sess.Save()
 		}
 
@@ -68,9 +68,9 @@ func MockAuth(isDemo bool) gin.HandlerFunc {
 
 		if mockUserID != "" {
 			// Save to session so it persists for subsequent requests
-			sess.Set("userId", mockUserID)
-			sess.Set("userName", mockUserName)
-			sess.Set("isAdmin", mockIsAdmin)
+			sess.Set(sessionUserId, mockUserID)
+			sess.Set(sessionUserName, mockUserName)
+			sess.Set(sessionIsAdmin, mockIsAdmin)
 			_ = sess.Save()
 
 			// Set Gin Context Keys
@@ -95,7 +95,7 @@ func setIdentity(c *gin.Context, userID, userName string, isAdmin bool) {
 
 // IsDemo returns true if the context identifies a Demo/Dev mode request.
 func IsDemo(ctx context.Context) bool {
-	val, _ := ctx.Value(isDemoKey).(bool)
+	val, _ := ctx.Value(keyIsDemo).(bool)
 	return val
 }
 

@@ -11,13 +11,11 @@ import (
 	"github.com/94peter/botreplyer/follow"
 )
 
-const keyIsAdmin ctxKey = "is_admin"
-
 func CheckAdmin(store follow.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sess := sessions.Default(c)
 
-		if val := sess.Get(string(keyIsAdmin)); val != nil {
+		if val := sess.Get(sessionIsAdmin); val != nil {
 			isAdmin, ok := val.(bool)
 			if !ok {
 				isAdmin = false
@@ -48,7 +46,7 @@ func CheckAdmin(store follow.Store) gin.HandlerFunc {
 		isAdmin := f.IsAdmin()
 		setIsAdmin(c, isAdmin)
 
-		sess.Set(string(keyIsAdmin), isAdmin)
+		sess.Set(sessionIsAdmin, isAdmin)
 		c.Next()
 	}
 }
@@ -58,6 +56,10 @@ func setIsAdmin(c *gin.Context, isAdmin bool) {
 	c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), keyIsAdmin, isAdmin))
 }
 
-func IsAdmin(c *gin.Context) bool {
-	return c.GetBool(string(keyIsAdmin))
+func IsAdmin(ctx context.Context) bool {
+	if ginCtx, ok := ctx.(*gin.Context); ok {
+		return ginCtx.GetBool(string(keyIsAdmin))
+	}
+	val, _ := ctx.Value(keyIsAdmin).(bool)
+	return val
 }
