@@ -44,7 +44,7 @@ func (m *Botreplyer) RunAllChecks(ctx context.Context, source *dagger.Directory)
 	modCache := dag.CacheVolume("go-mod-cache")
 	lintCache := dag.CacheVolume("golangci-lint-cache")
 
-	// 1. 定義基礎環境 (鎖定 Go 1.24)
+	// 1. 定義基礎環境 (鎖定 Go 1.25)
 	toolBase := dag.Container().
 		From("golang:1.25-bookworm").
 		WithMountedCache("/go/pkg/mod", modCache).
@@ -72,7 +72,7 @@ func (m *Botreplyer) RunAllChecks(ctx context.Context, source *dagger.Directory)
 	// 3. 執行 golangci-lint (包含你設定的 5m timeout)
 	safeGo(g, func() error {
 		_, err := dag.Container().
-			From("golangci/golangci-lint:v2.8-alpine").
+			From("golangci/golangci-lint:v2.11.4-alpine").
 			WithMountedCache("/root/.cache/golangci-lint", lintCache).
 			WithMountedCache("/go/pkg/mod", modCache). // Lint 也需要下載依賴，掛載它可以加速
 			WithDirectory("/src", source).
