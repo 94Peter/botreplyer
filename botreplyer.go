@@ -65,7 +65,7 @@ func GetFollowStore() follow.Store {
 }
 
 func initLineBot(cfg *line.Config, llmReply llm.LLMReply) error {
-	sdk, err := line.NewSDK(cfg.ChannelSecret, cfg.ChannelToken)
+	sdk, err := line.NewSDK(cfg.ChannelSecret, cfg.ChannelToken, cfg.IsDemo)
 	if err != nil {
 		return err
 	}

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/94peter/vulpes/log"
 	"github.com/line/line-bot-sdk-go/v7/linebot"
 	gocache "github.com/patrickmn/go-cache"
 )
@@ -28,20 +29,22 @@ const (
 	defaultCacheCleanupInterval = 10 * time.Minute
 )
 
-func NewSDK(channelSecret, accessToken string) (SDK, error) {
+func NewSDK(channelSecret, accessToken string, isDemo bool) (SDK, error) {
 	bot, err := linebot.New(channelSecret, accessToken)
 	if err != nil {
 		return nil, err
 	}
 	return &sdkImpl{
-		cache: gocache.New(defaultCacheExpiration, defaultCacheCleanupInterval),
-		bot:   bot,
+		cache:  gocache.New(defaultCacheExpiration, defaultCacheCleanupInterval),
+		bot:    bot,
+		isDemo: isDemo,
 	}, nil
 }
 
 type sdkImpl struct {
-	cache *gocache.Cache
-	bot   *linebot.Client
+	cache  *gocache.Cache
+	bot    *linebot.Client
+	isDemo bool
 }
 
 func (s *sdkImpl) ParseRequest(r *http.Request) ([]*linebot.Event, error) {
@@ -49,6 +52,10 @@ func (s *sdkImpl) ParseRequest(r *http.Request) ([]*linebot.Event, error) {
 }
 
 func (s *sdkImpl) PushMessage(userId string, messages ...linebot.SendingMessage) (*linebot.BasicResponse, error) {
+	if s.isDemo {
+		log.Infof("[DEMO] Suppressing PushMessage to %s: %+v", userId, messages)
+		return &linebot.BasicResponse{}, nil
+	}
 	return s.bot.PushMessage(userId, messages...).Do()
 }
 

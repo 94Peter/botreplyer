@@ -17,6 +17,7 @@ type Config struct {
 	ChannelToken        string
 	AdminUserId         string
 	Replies             []textreply.LineKeywordReply
+	IsDemo              bool
 }
 
 var DefaultConfig = &Config{}
@@ -56,5 +57,11 @@ func WithJoinGroupReplyFunc(f reply.JoinGroupReplyFunc) Option {
 func WithNotificationService(s notify.LineNotificationService) Option {
 	return func(c *Config) {
 		c.NotificationService = s
+	}
+}
+
+func WithIsDemo(isDemo bool) Option {
+	return func(c *Config) {
+		c.IsDemo = isDemo
 	}
 }
