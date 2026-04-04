@@ -5,20 +5,19 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/invopop/ctxi18n"
 )
 
-type contextKey string
-
 const (
-	mockTrue             = "true"
-	isDemoKey contextKey = "is_demo"
+	mockTrue         = "true"
+	isDemoKey ctxKey = "is_demo"
 )
 
 // MockAuth is a middleware that allows bypassing LINE login in Demo/Dev mode.
 // It checks for identity overrides in Query, Cookie, or Header.
 func MockAuth(isDemo bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set("is_demo", isDemo)
+		c.Set(isDemoKey, isDemo)
 		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), isDemoKey, isDemo))
 		// Only enable if isDemo is true
 		if !isDemo {
@@ -27,6 +26,22 @@ func MockAuth(isDemo bool) gin.HandlerFunc {
 		}
 
 		sess := sessions.Default(c)
+
+		// 1. Force ensure locale exists to prevent layout.templ from jumping to liff-init.js
+		const defaultLocale = "zh-tw"
+		userLocale, _ := sess.Get("locale").(string)
+		if userLocale == "" {
+			userLocale = defaultLocale
+			sess.Set("locale", userLocale)
+			_ = sess.Save()
+		}
+
+		// Directly inject Request Context, which is most effective for layout.templ's i18n.GetLocale(ctx)
+		newCtx, _ := ctxi18n.WithLocale(c.Request.Context(), userLocale)
+		c.Request = c.Request.WithContext(newCtx)
+
+		// Also set Gin Context so other middlewares can see it
+		c.Set(string(keyLocale), userLocale)
 
 		// 1. Check for mock_user_id
 		mockUserID := c.Query("mock_user_id")
@@ -55,16 +70,11 @@ func MockAuth(isDemo bool) gin.HandlerFunc {
 			// Save to session so it persists for subsequent requests
 			sess.Set("userId", mockUserID)
 			sess.Set("userName", mockUserName)
-			sess.Set(string(keyIsAdmin), mockIsAdmin)
+			sess.Set("isAdmin", mockIsAdmin)
 			_ = sess.Save()
 
 			// Set Gin Context Keys
 			setIdentity(c, mockUserID, mockUserName, mockIsAdmin)
-
-			// If we explicitly provided a mock_user_id, we might want to skip LineLiff logic
-			// but we can also just let LineLiff run and it will see the session is already set?
-			// Actually LineLiff only sets it if user_token is present or session is empty.
-			// Let's see LineLiff logic again.
 		}
 
 		c.Next()
@@ -81,4 +91,16 @@ func setIdentity(c *gin.Context, userID, userName string, isAdmin bool) {
 	ctx = context.WithValue(ctx, keyUserName, userName)
 	ctx = context.WithValue(ctx, keyIsAdmin, isAdmin)
 	c.Request = c.Request.WithContext(ctx)
+}
+
+// IsDemo returns true if the context identifies a Demo/Dev mode request.
+func IsDemo(ctx context.Context) bool {
+	val, _ := ctx.Value(isDemoKey).(bool)
+	return val
+}
+
+// GetLineUserName returns the current user name from context.
+func GetLineUserName(ctx context.Context) string {
+	val, _ := ctx.Value(keyUserName).(string)
+	return val
 }
