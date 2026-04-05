@@ -9,17 +9,19 @@ import (
 )
 
 const (
-	mockTrue = "true"
+	mockTrue       = "true"
+	defaultID      = "coach_demo"
+	defaultName    = "Sean (教練主理人)"
+	defaultIsAdmin = true
 )
 
 // MockAuth is a middleware that allows bypassing LINE login in Demo/Dev mode.
-// It checks for identity overrides in Query, Cookie, or Header.
 func MockAuth(isDemo bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Always set the isDemo flag
 		c.Set(string(keyIsDemo), isDemo)
 		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), keyIsDemo, isDemo))
 
-		// Only enable if isDemo is true
 		if !isDemo {
 			c.Next()
 			return
@@ -27,58 +29,81 @@ func MockAuth(isDemo bool) gin.HandlerFunc {
 
 		sess := sessions.Default(c)
 
-		// 1. Force ensure locale exists to prevent layout.templ from jumping to liff-init.js
-		const defaultLocale = "zh-tw"
-		userLocale, _ := sess.Get(sessionLocale).(string)
-		if userLocale == "" {
-			userLocale = defaultLocale
-			sess.Set(sessionLocale, userLocale)
-			_ = sess.Save()
-		}
+		// 1. Manage Locale (I18n)
+		ensureLocale(c, sess)
 
-		// Directly inject Request Context, which is most effective for layout.templ's i18n.GetLocale(ctx)
-		newCtx, _ := ctxi18n.WithLocale(c.Request.Context(), userLocale)
-		c.Request = c.Request.WithContext(newCtx)
+		// 2. Resolve Mock Identity
+		userID, userName, isAdmin := resolveIdentity(c, sess)
 
-		// Also set Gin Context so other middlewares can see it
-		c.Set(string(keyLocale), userLocale)
+		// 3. Persist and Inject Identity
+		sess.Set(sessionUserId, userID)
+		sess.Set(sessionUserName, userName)
+		sess.Set(sessionIsAdmin, isAdmin)
+		_ = sess.Save()
 
-		// 1. Check for mock_user_id
-		mockUserID := c.Query("mock_user_id")
-		if mockUserID == "" {
-			if cookie, err := c.Cookie("mock_user_id"); err == nil {
-				mockUserID = cookie
-			}
-		}
-		if mockUserID == "" {
-			mockUserID = c.GetHeader("X-Mock-User-ID")
-		}
-
-		// 2. Check for mock_user_name
-		mockUserName := c.Query("mock_user_name")
-		if mockUserName == "" {
-			mockUserName = c.GetHeader("X-Mock-User-Name")
-		}
-		if mockUserName == "" {
-			mockUserName = "Demo User"
-		}
-
-		// 3. Check for mock_is_admin
-		mockIsAdmin := c.Query("mock_is_admin") == mockTrue || c.GetHeader("X-Mock-Is-Admin") == mockTrue
-
-		if mockUserID != "" {
-			// Save to session so it persists for subsequent requests
-			sess.Set(sessionUserId, mockUserID)
-			sess.Set(sessionUserName, mockUserName)
-			sess.Set(sessionIsAdmin, mockIsAdmin)
-			_ = sess.Save()
-
-			// Set Gin Context Keys
-			setIdentity(c, mockUserID, mockUserName, mockIsAdmin)
-		}
+		setIdentity(c, userID, userName, isAdmin)
 
 		c.Next()
 	}
+}
+
+// ensureLocale ensures a locale exists in the session and injects it into both Gin and Request contexts.
+func ensureLocale(c *gin.Context, sess sessions.Session) {
+	const defaultLocale = "zh-tw"
+	userLocale, _ := sess.Get(sessionLocale).(string)
+	if userLocale == "" {
+		userLocale = defaultLocale
+		sess.Set(sessionLocale, userLocale)
+		_ = sess.Save()
+	}
+
+	// Directly inject Request Context for layout.templ's i18n helper
+	newCtx, _ := ctxi18n.WithLocale(c.Request.Context(), userLocale)
+	c.Request = c.Request.WithContext(newCtx)
+
+	// Set Gin Context for other middlewares
+	c.Set(string(keyLocale), userLocale)
+}
+
+// resolveIdentity determines the current user identity based on a priority queue:
+// Query/Header > Session > Default Fallback
+func resolveIdentity(c *gin.Context, sess sessions.Session) (id, name string, isAdmin bool) {
+	// A. Check Request-level overrides (Query or Headers)
+	id = getFirst(c.Query("mock_user_id"), c.GetHeader("X-Mock-User-ID"))
+	name = getFirst(c.Query("mock_user_name"), c.GetHeader("X-Mock-User-Name"))
+
+	// B. If no request override, try persistent Session
+	if id == "" {
+		if sID, ok := sess.Get(sessionUserId).(string); ok {
+			id = sID
+			if sName, ok := sess.Get(sessionUserName).(string); ok {
+				name = sName
+			}
+		}
+	}
+
+	// C. Resolve Admin status if an ID exists
+	if id != "" {
+		isAdmin = c.Query("mock_is_admin") == mockTrue || c.GetHeader("X-Mock-Is-Admin") == mockTrue
+		if !isAdmin {
+			if sAdmin, ok := sess.Get(sessionIsAdmin).(bool); ok {
+				isAdmin = sAdmin
+			}
+		}
+		return
+	}
+
+	// D. Final Fallback to hardcoded defaults
+	return defaultID, defaultName, defaultIsAdmin
+}
+
+func getFirst(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func setIdentity(c *gin.Context, userID, userName string, isAdmin bool) {
