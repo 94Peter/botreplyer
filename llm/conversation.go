@@ -172,14 +172,7 @@ func (c *conversation) Chat(ctx context.Context, message string, inputs map[stri
 		return "", fmt.Errorf("failed to format chat template: %w", err)
 	}
 
-	// Pass the formatted prompt as the 'input' to the agent executor.
-	// The executor will handle it as the user query.
-	// We use a map to be explicit, although chains.Run(..., string) might also work.
-	chainInputs := map[string]any{
-		"input": prompt,
-	}
-
-	result, err := chains.Run(ctx, c.chain, chainInputs)
+	result, err := chains.Run(ctx, c.chain, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to run chain: %w", err)
 	}
